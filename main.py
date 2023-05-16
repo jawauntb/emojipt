@@ -9,7 +9,7 @@ CORS(app)
 
 # Initialize LLMChain
 llm = OpenAI(temperature=0, openai_api_key=openai_api_key)
-prompt_template = "Give me some emojis related to {input}"
+prompt_template = "Give me 20 emojis related to {input}"
 llm_chain = LLMChain(llm=llm,
                      prompt=PromptTemplate.from_template(prompt_template))
 
