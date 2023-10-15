@@ -45,9 +45,10 @@ def generate_response():
   response = requests.post('https://api.openai.com/v1/chat/completions',
                            headers=headers,
                            json=payload)
-  return response
+
+  # Extract content from the requests.Response and return as Flask Response
+  return jsonify(response.json())
 
 
 if __name__ == "__main__":
   app.run()
-
