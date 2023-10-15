@@ -12,6 +12,7 @@ langchain = "^0.0.165"
 openai = "^0.27.6"
 requests = "^2.30.0"
 Flask-Cors = "^3.0.10"
+gunicorn = "^21.2.0"
 
 [tool.poetry.dev-dependencies]
 debugpy = "^1.6.2"

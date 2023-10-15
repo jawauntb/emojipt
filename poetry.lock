@@ -227,6 +227,23 @@ docs = ["sphinx", "docutils (<0.18)"]
 test = ["objgraph", "psutil"]
 
 [[package]]
+name = "gunicorn"
+version = "21.2.0"
+description = "WSGI HTTP Server for UNIX"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[package.dependencies]
+packaging = "*"
+
+[package.extras]
+eventlet = ["eventlet (>=0.24.1)"]
+gevent = ["gevent (>=1.4.0)"]
+setproctitle = ["setproctitle"]
+tornado = ["tornado (>=0.2)"]
+
+[[package]]
 name = "idna"
 version = "3.4"
 description = "Internationalized Domain Names in Applications (IDNA)"
@@ -554,7 +571,7 @@ test = ["pylint", "pycodestyle", "pyflakes", "pytest", "pytest-cov", "coverage"]
 
 [[package]]
 name = "pytoolconfig"
-version = "1.2.5"
+version = "1.2.6"
 description = "Python tool configuration"
 category = "dev"
 optional = false
@@ -566,10 +583,10 @@ platformdirs = {version = ">=1.4.4", optional = true, markers = "extra == \"glob
 tomli = {version = ">=2.0.1", markers = "python_version < \"3.11\""}
 
 [package.extras]
+validation = ["pydantic (>=1.7.4)"]
+global = ["platformdirs (>=1.4.4)"]
 doc = ["tabulate (>=0.8.9)", "sphinx (>=4.5.0)"]
 gendocs = ["sphinx (>=4.5.0)", "sphinx-autodoc-typehints (>=1.18.1)", "sphinx-rtd-theme (>=1.0.0)", "pytoolconfig"]
-global = ["platformdirs (>=1.4.4)"]
-validation = ["pydantic (>=1.7.4)"]
 
 [[package]]
 name = "pyyaml"
@@ -832,7 +849,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10.0,<3.11"
-content-hash = "a96e9ac786e1137b2913dd0cad35be6387488b6647b4645d4d0779b70f00557d"
+content-hash = "1c6c3c5c2ec83572e32470ee454bff3a1b403a15ed4fbe59a627b549a1ec2c53"
 
 [metadata.files]
 aiohttp = []
@@ -853,6 +870,7 @@ flask = []
 flask-cors = []
 frozenlist = []
 greenlet = []
+gunicorn = []
 idna = []
 iso8601 = []
 itsdangerous = []
