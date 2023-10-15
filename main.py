@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from langchain import PromptTemplate, OpenAI, LLMChain
 from flask_cors import CORS
 import os
+import requests
 
 app = Flask(__name__)
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -28,14 +29,23 @@ def generate_emojis():
 
   # Debugging print statements
   print("Result: ", result)
+  print("input: ", input_data)
 
-  # Depending on your result you may need to adjust the following lines
-  # Check if input is emoji or not
-
-  # If it's not emoji, generate 6 related emojis
   emojis = result
 
   return jsonify({'emojis': emojis})
+
+
+@app.route('/promptly', methods=['POST'])
+def generate_response():
+  data = request.get_json()
+  payload = data.get('payload', '')
+  authkey = 'Bearer ' + openai_api_key
+  headers = {'Authorization': authkey, 'Content-Type': 'application/json'}
+  response = requests.post('https://api.openai.com/v1/chat/completions',
+                           headers=headers,
+                           json=payload)
+  return response
 
 
 if __name__ == "__main__":
