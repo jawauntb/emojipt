@@ -49,5 +49,22 @@ def generate_response():
   return jsonify(response.json())
 
 
+@app.route('/gen_image', methods=['POST'])
+def generate_image():
+  data = request.get_json()
+  prompt = data.get('prompt', '')
+  n = data.get('n', 4)
+  size = data.get('size', '1024x1024')
+
+  authkey = 'Bearer ' + openai_api_key
+  headers = {'Authorization': authkey, 'Content-Type': 'application/json'}
+  payload = {"prompt": prompt, "n": n, "size": size}
+
+  response = requests.post('https://api.openai.com/v1/images/generations',
+                           headers=headers,
+                           json=payload)
+  return jsonify(response.json())
+
+
 if __name__ == "__main__":
   app.run()
