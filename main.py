@@ -3,6 +3,7 @@ from langchain import PromptTemplate, OpenAI, LLMChain
 from flask_cors import CORS
 import os
 import requests
+import base64
 
 app = Flask(__name__)
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -73,6 +74,54 @@ def generate_image():
   response = requests.post('https://api.openai.com/v1/images/generations',
                            headers=headers,
                            json=payload)
+  return jsonify(response.json())
+
+
+@app.route('/analyze_uploaded_image', methods=['POST'])
+def analyze_uploaded_image():
+  # Check if the post request has the file part
+  if 'image' not in request.files:
+    return jsonify({'error': 'No image part in the request'}), 400
+
+  file = request.files['image']
+
+  if file.filename == '':
+    return jsonify({'error': 'No image selected for uploading'}), 400
+
+  # Convert the image file to a base64 encoded string
+  image_encoded = base64.b64encode(file.read()).decode('utf-8')
+
+  # Prepare the payload for OpenAI's GPT-4 Vision API
+  payload = {
+    "model":
+    "gpt-4-vision-preview",
+    "messages": [{
+      "role":
+      "user",
+      "content": [{
+        "type": "image_url",
+        "image_url": {
+          "url": f"data:image/jpeg;base64,{image_encoded}"
+        }
+      }]
+    }]
+  }
+
+  headers = {
+    'Authorization': 'Bearer ' + openai_api_key,
+    'Content-Type': 'application/json'
+  }
+
+  # Send the request to OpenAI's API
+  response = requests.post('https://api.openai.com/v1/chat/completions',
+                           headers=headers,
+                           json=payload)
+
+  if response.status_code != 200:
+    return jsonify({'error':
+                    'Error processing the image'}), response.status_code
+
+  # Return the response from the OpenAI API
   return jsonify(response.json())
 
 
