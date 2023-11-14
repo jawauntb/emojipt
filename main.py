@@ -99,12 +99,20 @@ def analyze_uploaded_image():
       "role":
       "user",
       "content": [{
+        "type":
+        "text",
+        "text":
+        "Give me a detailed description of this UI and the various components in it, so that i can reproduce it. If its not a UI, describe a UI that conveys the content of the image"
+      }, {
         "type": "image_url",
         "image_url": {
           "url": f"data:image/jpeg;base64,{image_encoded}"
         }
       }]
-    }]
+    }],
+    "max_tokens":
+    4000,
+    "detail": "high"
   }
 
   headers = {
