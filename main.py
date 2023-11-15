@@ -1,18 +1,16 @@
 from flask import Flask, request, jsonify
 from langchain import PromptTemplate, OpenAI, LLMChain
-from langchain.document_loaders import LocalFileLoader
+# from langchain.document_loaders import LocalFileLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
 from langchain.chat_models import ChatOpenAI
-from langchain import hub
-from langchain.schema import StrOutputParser, RunnablePassthrough
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 from flask_cors import CORS
 import os
 import requests
 import base64
-import glob
-
+import json
 
 app = Flask(__name__)
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -72,6 +70,16 @@ def get_sitesee():
   return jsonify(response.json())
 
 
+def load_documents_from_directory(directory_path):
+  documents = []
+  for filename in os.listdir(directory_path):
+    if filename.endswith('.txt'):
+      with open(os.path.join(directory_path, filename), 'r') as file:
+        content = file.read()
+        documents.append(content)  # Each document's content is a string
+  return documents
+
+
 @app.route('/gen_image', methods=['POST'])
 def generate_image():
   data = request.get_json()
@@ -121,7 +129,8 @@ def analyze_uploaded_image():
     }],
     "max_tokens":
     4000,
-    "detail": "high"
+    "detail":
+    "high"
   }
 
   headers = {
@@ -142,38 +151,52 @@ def analyze_uploaded_image():
   return jsonify(response.json())
 
 
+# Function to load embeddings and their associated document splits
+def load_embeddings_and_splits():
+  print('load_embeddings_and_splits')
+  with open('slow_embeddings.json', 'r') as file:
+    data = json.load(file)
+  embeddings = np.array(data['embeddings'])
+  splits = data['splits']
+  return embeddings, splits
+
+
+# Function to find the most relevant document splits
+def find_relevant_splits(question_embedding, embeddings, splits, top_n=3):
+  print('find_relevant_splits')
+  similarities = cosine_similarity([question_embedding], embeddings)[0]
+  top_indices = np.argsort(similarities)[-top_n:]
+  return [splits[i] for i in top_indices]
+
+
 @app.route('/rag_qa', methods=['POST'])
 def rag_qa():
-    # Load and split documents
-    loader = LocalFileLoader(file_paths=glob.glob('slowgpt_docs/*.txt'))
-    docs = loader.load()
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    splits = text_splitter.split_documents(docs)
+  print('running')
+  # Load embeddings and splits
+  embeddings, splits = load_embeddings_and_splits()
 
-    # Embed and store document splits
-    vectorstore = Chroma.from_documents(documents=splits, embedding=OpenAIEmbeddings())
-    retriever = vectorstore.as_retriever()
+  # Retrieve the question from the request and generate its embedding
+  question = request.json.get('question')
+  question_embedding = OpenAIEmbeddings().get_embeddings(question)
+  print('getting question')
+  # Find the most relevant document splits
+  relevant_splits = find_relevant_splits(question_embedding, embeddings,
+                                         splits)
 
-    # Retrieve and generate response
-    question = request.json.get('question')
-    formatted_docs = "\n\n".join(doc.page_content for doc in retriever.get_relevant_documents(question))
-    prompt = hub.pull("rlm/rag-prompt")
+  # Construct the context from relevant splits
+  formatted_docs = "\n\n".join(relevant_splits)
+  print('sending')
+  # Construct the prompt for the language model
+  prompt = f"You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the answer concise.\nQuestion: {question}\nContext: {formatted_docs}\nAnswer:"
 
-    # Set up the RAG chain
-    rag_chain = (
-        {"context": formatted_docs, "question": question}
-        | prompt
-        | ChatOpenAI(model_name="gpt-4-1106-preview", temperature=0)
-        | StrOutputParser()
-    )
+  # Generate the response using the language model
+  response = ChatOpenAI(model_name="gpt-4-1106-preview",
+                        temperature=0).invoke(prompt)
 
-    # Generate the response
-    response = rag_chain.invoke(question)
+  # Return the generated response
+  return jsonify({'answer': response})
 
-    # Clean up
-    vectorstore.delete_collection()
-
-    return jsonify({'answer': response})
 
 if __name__ == "__main__":
+  print('hi')
   app.run()
