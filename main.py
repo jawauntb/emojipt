@@ -1,9 +1,18 @@
 from flask import Flask, request, jsonify
 from langchain import PromptTemplate, OpenAI, LLMChain
+from langchain.document_loaders import LocalFileLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.vectorstores import Chroma
+from langchain.chat_models import ChatOpenAI
+from langchain import hub
+from langchain.schema import StrOutputParser, RunnablePassthrough
 from flask_cors import CORS
 import os
 import requests
 import base64
+import glob
+
 
 app = Flask(__name__)
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -102,7 +111,7 @@ def analyze_uploaded_image():
         "type":
         "text",
         "text":
-        "Give me a detailed description of this UI and the various components in it, so that i can reproduce it. If its not a UI, describe a UI that conveys the content of the image"
+        "Give me a detailed description of this UI and the various components in it, so that i can reproduce it. If its not a UI, interpret the image as though it is a novel UI"
       }, {
         "type": "image_url",
         "image_url": {
@@ -132,6 +141,39 @@ def analyze_uploaded_image():
   # Return the response from the OpenAI API
   return jsonify(response.json())
 
+
+@app.route('/rag_qa', methods=['POST'])
+def rag_qa():
+    # Load and split documents
+    loader = LocalFileLoader(file_paths=glob.glob('slowgpt_docs/*.txt'))
+    docs = loader.load()
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    splits = text_splitter.split_documents(docs)
+
+    # Embed and store document splits
+    vectorstore = Chroma.from_documents(documents=splits, embedding=OpenAIEmbeddings())
+    retriever = vectorstore.as_retriever()
+
+    # Retrieve and generate response
+    question = request.json.get('question')
+    formatted_docs = "\n\n".join(doc.page_content for doc in retriever.get_relevant_documents(question))
+    prompt = hub.pull("rlm/rag-prompt")
+
+    # Set up the RAG chain
+    rag_chain = (
+        {"context": formatted_docs, "question": question}
+        | prompt
+        | ChatOpenAI(model_name="gpt-4-1106-preview", temperature=0)
+        | StrOutputParser()
+    )
+
+    # Generate the response
+    response = rag_chain.invoke(question)
+
+    # Clean up
+    vectorstore.delete_collection()
+
+    return jsonify({'answer': response})
 
 if __name__ == "__main__":
   app.run()
