@@ -3,8 +3,7 @@ from langchain import PromptTemplate, OpenAI, LLMChain
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
 from sklearn.metrics.pairwise import cosine_similarity
-from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
-from langchain.schema.messages import BaseMessage
+from langchain.prompts import ChatPromptTemplate
 
 import numpy as np
 from flask_cors import CORS
@@ -194,6 +193,7 @@ def find_relevant_splits(question_embedding, top_n=3):
 
 @app.route('/rag_qa', methods=['POST'])
 def rag_qa():
+  print('trying')
   try:
     question = request.json.get('question')
     question_embedding = OpenAIEmbeddings().embed_query(question)
@@ -201,14 +201,12 @@ def rag_qa():
     formatted_docs = "\n\n".join(relevant_splits)
     system_prompt = "You are an assistant... "
     prompt = rf"Question: {question}\nContext: {formatted_docs}\nAnswer:"
-
-    # Create a BaseMessage object
-    user_msg = BaseMessage(content=prompt, type="user")
-    sys_msg = BaseMessage(content=system_prompt, type="system")
-
-    messages = [sys_msg, user_msg]
+    # Create a ChatPromptTemplate object
+    template = ChatPromptTemplate.from_messages([("system", system_prompt),
+                                                 ("user", prompt)])
+    print('trying', template)
     chat_model = ChatOpenAI(model_name="gpt-4-1106-preview", temperature=0)
-    response = chat_model.generate(messages=[messages])
+    response = chat_model.generate(template=template)
     generated_responses = response.generated_responses
     answer = generated_responses[0]
 
