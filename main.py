@@ -1,9 +1,7 @@
 from flask import Flask, request, jsonify
 from langchain import PromptTemplate, OpenAI, LLMChain
 from langchain.embeddings import OpenAIEmbeddings
-from langchain.chat_models import ChatOpenAI
 from sklearn.metrics.pairwise import cosine_similarity
-from langchain.prompts.chat import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 import numpy as np
 from flask_cors import CORS
 import os
@@ -188,7 +186,7 @@ def find_relevant_splits(question_embedding, top_n=3):
   return [global_splits[i] for i in top_indices]
 
 
-def do_rag_qa(model_name):
+def do_rag_qa(model_name, request):
   try:
     question = request.json.get('question')
     question_embedding = OpenAIEmbeddings().embed_query(question)
@@ -227,12 +225,12 @@ def do_rag_qa(model_name):
 
 @app.route('/rag_qa', methods=['POST'])
 def rag_qa():
-  return do_rag_qa("gpt-4-1106-preview")
+  return do_rag_qa("gpt-4-1106-preview", request)
 
 
 @app.route('/ft_embed', methods=['POST'])
 def fine_tuned_rag():
-  return do_rag_qa("ft:gpt-3.5-turbo-1106:personal::8KXfk56f")
+  return do_rag_qa("ft:gpt-3.5-turbo-1106:personal::8KXfk56f", request)
 
 
 if __name__ == "__main__":
