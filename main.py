@@ -1,7 +1,5 @@
 from flask import Flask, request, jsonify
 from langchain import PromptTemplate, OpenAI, LLMChain
-# from langchain.document_loaders import LocalFileLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
 from sklearn.metrics.pairwise import cosine_similarity
@@ -10,7 +8,6 @@ from flask_cors import CORS
 import os
 import requests
 import base64
-import json
 
 app = Flask(__name__)
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -151,31 +148,38 @@ def analyze_uploaded_image():
   return jsonify(response.json())
 
 
+# Function to load data from IPFS
 def load_data_from_ipfs(cid):
-    url = f'https://ipfs.io/ipfs/{cid}'
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
-        # Process your data (e.g., load into global variables)
-        return data
-    else:
-        print(f'Failed to fetch data from IPFS: {response.status_code}')
-        return None
+  print('load_data_from_ipfs')
+  url = f'https://ipfs.io/ipfs/{cid}'
+  response = requests.get(url)
+  if response.status_code == 200:
+    return response.json()
+  else:
+    print(f'Failed to fetch data from IPFS: {response.status_code}')
+    return None
+
 
 # Global variables to hold embeddings and document splits
 global_embeddings = None
 global_splits = None
 
+
+# Function to load embeddings and splits
 def load_embeddings_and_splits():
+  print('load_embeddings_and_splits')
   global global_embeddings, global_splits
   if global_embeddings is None or global_splits is None:
-    with open('./slow_embeddings.json', 'r') as file:
-      data = json.load(file)
-    global_embeddings = np.array(data['embeddings'])
-    global_splits = data['splits']
+    ipfs_cid = 'QmQKZY5BZMXuwdRi71cESn9beixqYCzAoz68Vch4ZNvYyW'
+    data = load_data_from_ipfs(ipfs_cid)
+    if data:
+      global_embeddings = np.array(data['embeddings'])
+      global_splits = data['splits']
 
 
+# Function to find the most relevant document splits
 def find_relevant_splits(question_embedding, top_n=3):
+  print('find_relevant_splits')
   global global_embeddings, global_splits
   if global_embeddings is None or global_splits is None:
     load_embeddings_and_splits()
@@ -186,17 +190,18 @@ def find_relevant_splits(question_embedding, top_n=3):
 
 @app.route('/rag_qa', methods=['POST'])
 def rag_qa():
-  question = request.json.get('question')
-  question_embedding = OpenAIEmbeddings().get_embeddings(question)
-
-  relevant_splits = find_relevant_splits(question_embedding)
-  formatted_docs = "\n\n".join(relevant_splits)
-
-  prompt = f"You are an assistant... \nQuestion: {question}\nContext: {formatted_docs}\nAnswer:"
-  response = ChatOpenAI(model_name="gpt-4-1106-preview",
-                        temperature=0).invoke(prompt)
-
-  return jsonify({'answer': response})
+  try:
+    question = request.json.get('question')
+    question_embedding = OpenAIEmbeddings().embed_query(question)
+    relevant_splits = find_relevant_splits(question_embedding)
+    formatted_docs = "\n\n".join(relevant_splits)
+    prompt = f"You are an assistant... \nQuestion: {question}\nContext: {formatted_docs}\nAnswer:"
+    response = ChatOpenAI(model_name="gpt-4-1106-preview",
+                          temperature=0).generate(prompt)
+    return jsonify({'answer': response.generated_responses[0]})
+  except Exception as e:
+    print(f"Error: {e}")
+    return jsonify({'error': str(e)}), 500
 
 
 if __name__ == "__main__":
