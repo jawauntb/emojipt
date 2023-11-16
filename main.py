@@ -201,14 +201,11 @@ def rag_qa():
     formatted_docs = "\n\n".join(relevant_splits)
     system_prompt = "You are an assistant... "
     prompt = rf"Question: {question}\nContext: {formatted_docs}\nAnswer:"
-    # Create a ChatPromptTemplate object
-    # Create a ChatPromptTemplate object
-    # Create a ChatMessagePromptTemplate object
-    template = ChatPromptTemplate.from_messages([
-      SystemMessagePromptTemplate(template=system_prompt),
-      ChatMessagePromptTemplate(template=prompt)
-    ])
 
+    template = ChatPromptTemplate.from_messages([
+      SystemMessagePromptTemplate(prompt=system_prompt),
+      ChatMessagePromptTemplate(prompt=prompt)
+    ])
     print('trying', template)
     chat_model = ChatOpenAI(model_name="gpt-4-1106-preview", temperature=0)
     response = chat_model.generate(template=template)
