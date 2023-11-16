@@ -151,52 +151,53 @@ def analyze_uploaded_image():
   return jsonify(response.json())
 
 
-# Function to load embeddings and their associated document splits
+def load_data_from_ipfs(cid):
+    url = f'https://ipfs.io/ipfs/{cid}'
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        # Process your data (e.g., load into global variables)
+        return data
+    else:
+        print(f'Failed to fetch data from IPFS: {response.status_code}')
+        return None
+
+# Global variables to hold embeddings and document splits
+global_embeddings = None
+global_splits = None
+
 def load_embeddings_and_splits():
-  print('load_embeddings_and_splits')
-  with open('slow_embeddings.json', 'r') as file:
-    data = json.load(file)
-  embeddings = np.array(data['embeddings'])
-  splits = data['splits']
-  return embeddings, splits
+  global global_embeddings, global_splits
+  if global_embeddings is None or global_splits is None:
+    with open('./slow_embeddings.json', 'r') as file:
+      data = json.load(file)
+    global_embeddings = np.array(data['embeddings'])
+    global_splits = data['splits']
 
 
-# Function to find the most relevant document splits
-def find_relevant_splits(question_embedding, embeddings, splits, top_n=3):
-  print('find_relevant_splits')
-  similarities = cosine_similarity([question_embedding], embeddings)[0]
+def find_relevant_splits(question_embedding, top_n=3):
+  global global_embeddings, global_splits
+  if global_embeddings is None or global_splits is None:
+    load_embeddings_and_splits()
+  similarities = cosine_similarity([question_embedding], global_embeddings)[0]
   top_indices = np.argsort(similarities)[-top_n:]
-  return [splits[i] for i in top_indices]
+  return [global_splits[i] for i in top_indices]
 
 
 @app.route('/rag_qa', methods=['POST'])
 def rag_qa():
-  print('running')
-  # Load embeddings and splits
-  embeddings, splits = load_embeddings_and_splits()
-
-  # Retrieve the question from the request and generate its embedding
   question = request.json.get('question')
   question_embedding = OpenAIEmbeddings().get_embeddings(question)
-  print('getting question')
-  # Find the most relevant document splits
-  relevant_splits = find_relevant_splits(question_embedding, embeddings,
-                                         splits)
 
-  # Construct the context from relevant splits
+  relevant_splits = find_relevant_splits(question_embedding)
   formatted_docs = "\n\n".join(relevant_splits)
-  print('sending')
-  # Construct the prompt for the language model
-  prompt = f"You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the answer concise.\nQuestion: {question}\nContext: {formatted_docs}\nAnswer:"
 
-  # Generate the response using the language model
+  prompt = f"You are an assistant... \nQuestion: {question}\nContext: {formatted_docs}\nAnswer:"
   response = ChatOpenAI(model_name="gpt-4-1106-preview",
                         temperature=0).invoke(prompt)
 
-  # Return the generated response
   return jsonify({'answer': response})
 
 
 if __name__ == "__main__":
-  print('hi')
   app.run()
