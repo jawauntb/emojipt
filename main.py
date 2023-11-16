@@ -3,6 +3,9 @@ from langchain import PromptTemplate, OpenAI, LLMChain
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
 from sklearn.metrics.pairwise import cosine_similarity
+from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
+from langchain.schema.messages import BaseMessage
+
 import numpy as np
 from flask_cors import CORS
 import os
@@ -185,6 +188,7 @@ def find_relevant_splits(question_embedding, top_n=3):
     load_embeddings_and_splits()
   similarities = cosine_similarity([question_embedding], global_embeddings)[0]
   top_indices = np.argsort(similarities)[-top_n:]
+  print()
   return [global_splits[i] for i in top_indices]
 
 
@@ -195,10 +199,22 @@ def rag_qa():
     question_embedding = OpenAIEmbeddings().embed_query(question)
     relevant_splits = find_relevant_splits(question_embedding)
     formatted_docs = "\n\n".join(relevant_splits)
-    prompt = f"You are an assistant... \nQuestion: {question}\nContext: {formatted_docs}\nAnswer:"
-    response = ChatOpenAI(model_name="gpt-4-1106-preview",
-                          temperature=0).generate(prompt)
-    return jsonify({'answer': response.generated_responses[0]})
+    system_prompt = "You are an assistant... "
+    prompt = rf"Question: {question}\nContext: {formatted_docs}\nAnswer:"
+
+    # Create a BaseMessage object
+    user_msg = BaseMessage(content=prompt, type="user")
+    sys_msg = BaseMessage(content=system_prompt, type="system")
+
+    messages = [sys_msg, user_msg]
+    chat_model = ChatOpenAI(model_name="gpt-4-1106-preview", temperature=0)
+    response = chat_model.generate(messages=[messages])
+    generated_responses = response.generated_responses
+    answer = generated_responses[0]
+
+    print('generated_responses:', generated_responses)
+    print('answer:', answer)
+    return jsonify({'answer': answer})
   except Exception as e:
     print(f"Error: {e}")
     return jsonify({'error': str(e)}), 500
