@@ -3,7 +3,7 @@ from langchain import PromptTemplate, OpenAI, LLMChain
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
 from sklearn.metrics.pairwise import cosine_similarity
-from langchain.prompts import ChatPromptTemplate
+from langchain.prompts.chat import ChatMessagePromptTemplate, ChatPromptTemplate, SystemMessagePromptTemplate
 
 import numpy as np
 from flask_cors import CORS
@@ -202,8 +202,13 @@ def rag_qa():
     system_prompt = "You are an assistant... "
     prompt = rf"Question: {question}\nContext: {formatted_docs}\nAnswer:"
     # Create a ChatPromptTemplate object
-    template = ChatPromptTemplate.from_messages([("system", system_prompt),
-                                                 ("user", prompt)])
+    # Create a ChatPromptTemplate object
+    # Create a ChatMessagePromptTemplate object
+    template = ChatPromptTemplate.from_messages([
+      SystemMessagePromptTemplate(template=system_prompt),
+      ChatMessagePromptTemplate(template=prompt)
+    ])
+
     print('trying', template)
     chat_model = ChatOpenAI(model_name="gpt-4-1106-preview", temperature=0)
     response = chat_model.generate(template=template)
