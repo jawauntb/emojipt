@@ -3,8 +3,7 @@ from langchain import PromptTemplate, OpenAI, LLMChain
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
 from sklearn.metrics.pairwise import cosine_similarity
-from langchain.prompts.chat import ChatMessagePromptTemplate, ChatPromptTemplate, SystemMessagePromptTemplate
-
+from langchain.prompts.chat import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 import numpy as np
 from flask_cors import CORS
 import os
@@ -169,7 +168,6 @@ global_splits = None
 
 # Function to load embeddings and splits
 def load_embeddings_and_splits():
-  print('load_embeddings_and_splits')
   global global_embeddings, global_splits
   if global_embeddings is None or global_splits is None:
     ipfs_cid = 'QmQKZY5BZMXuwdRi71cESn9beixqYCzAoz68Vch4ZNvYyW'
@@ -181,7 +179,6 @@ def load_embeddings_and_splits():
 
 # Function to find the most relevant document splits
 def find_relevant_splits(question_embedding, top_n=3):
-  print('find_relevant_splits')
   global global_embeddings, global_splits
   if global_embeddings is None or global_splits is None:
     load_embeddings_and_splits()
@@ -191,33 +188,51 @@ def find_relevant_splits(question_embedding, top_n=3):
   return [global_splits[i] for i in top_indices]
 
 
-@app.route('/rag_qa', methods=['POST'])
-def rag_qa():
-  print('trying')
+def do_rag_qa(model_name):
   try:
     question = request.json.get('question')
     question_embedding = OpenAIEmbeddings().embed_query(question)
     relevant_splits = find_relevant_splits(question_embedding)
     formatted_docs = "\n\n".join(relevant_splits)
-    system_prompt = "You are an assistant... "
-    prompt = rf"Question: {question}\nContext: {formatted_docs}\nAnswer:"
 
-    template = ChatPromptTemplate.from_messages([
-      SystemMessagePromptTemplate(prompt=system_prompt),
-      ChatMessagePromptTemplate(prompt=prompt)
-    ])
-    print('trying', template)
-    chat_model = ChatOpenAI(model_name="gpt-4-1106-preview", temperature=0)
-    response = chat_model.generate(template=template)
-    generated_responses = response.generated_responses
-    answer = generated_responses[0]
+    leftist_prompt = """You are a leftist policy analyst. Your education encompasses the study of seminal intellectuals such as bell hooks, Edward Said, and Frantz Fanon. You seamlessly integrate their perspectives into every analysis you conduct, ensuring that your work is infused with their groundbreaking insights on race, class, and social dynamics. This approach not only enriches your evaluations but also aligns them with the progressive principles that these thinkers advocated."""
 
-    print('generated_responses:', generated_responses)
-    print('answer:', answer)
-    return jsonify({'answer': answer})
+    user_prompt = rf"Question: {question}\nContext: {formatted_docs}\nAnswer:"
+
+    payload = {
+      "model":
+      model_name,
+      "messages": [{
+        "role": "system",
+        "content": leftist_prompt
+      }, {
+        "role": "user",
+        "content": user_prompt
+      }]
+    }
+
+    authkey = 'Bearer ' + openai_api_key
+    headers = {'Authorization': authkey, 'Content-Type': 'application/json'}
+
+    response = requests.post('https://api.openai.com/v1/chat/completions',
+                             headers=headers,
+                             json=payload)
+
+    return jsonify(response.json())
+
   except Exception as e:
     print(f"Error: {e}")
     return jsonify({'error': str(e)}), 500
+
+
+@app.route('/rag_qa', methods=['POST'])
+def rag_qa():
+  return do_rag_qa("gpt-4-1106-preview")
+
+
+@app.route('/ft_embed', methods=['POST'])
+def fine_tuned_rag():
+  return do_rag_qa("ft:gpt-3.5-turbo-1106:personal::8KXfk56f")
 
 
 if __name__ == "__main__":
